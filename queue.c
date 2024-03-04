@@ -79,7 +79,6 @@ element_t *q_remove_head(struct list_head *head, char *sp, size_t bufsize)
         strncpy(sp, rm_node->value, bufsize - 1);
         sp[bufsize - 1] = '\0';
     }
-
     return rm_node;
 }
 
@@ -200,39 +199,29 @@ void q_reverseK(struct list_head *head, int k)
             q_reverse(&tmp);
             count = 0;
             list_splice(&tmp, cut);
-
             cut = safe->prev;
         }
     }
 }
-static int q_merage_two(struct list_head *first,
-                        struct list_head *second,
-                        bool descend)
+static int q_merge_two(struct list_head *L1, struct list_head *L2, bool descend)
 {
-    if (!first || !second)
+    if (!L1 || !L2)
         return 0;
 
     int count = 0;
     LIST_HEAD(tmp);
-    while (!list_empty(first) && !list_empty(second)) {
-        element_t *f = list_first_entry(first, element_t, list);
-        element_t *s = list_first_entry(second, element_t, list);
-        // int cmp = strcmp(f->value, s->value);
-        // if (descend)
-        //     cmp = -cmp;
-        // if (cmp <= 0)
-        //     list_move_tail(&f->list, &tmp);
-        // else
-        //     list_move_tail(&s->list, &tmp);
-        if (descend ^ (strcmp(f->value, s->value) <= 0))
-            list_move_tail(&f->list, &tmp);
+    while (!list_empty(L1) && !list_empty(L2)) {
+        element_t *L1_entry = list_first_entry(L1, element_t, list);
+        element_t *L2_entry = list_first_entry(L2, element_t, list);
+        if (descend ^ (strcmp(L1_entry->value, L2_entry->value) <= 0))
+            list_move_tail(&L1_entry->list, &tmp);
         else
-            list_move_tail(&s->list, &tmp);
+            list_move_tail(&L2_entry->list, &tmp);
         count++;
     }
-    count += q_size(first) + q_size(second);
-    list_splice(&tmp, first);
-    list_splice_tail_init(second, first);
+    count += q_size(L1) + q_size(L2);
+    list_splice(&tmp, L1);
+    list_splice_tail_init(L2, L1);
 
     return count;
 }
@@ -243,27 +232,14 @@ void q_sort(struct list_head *head, bool descend)
         return;
 
     /* Find middle point */
-    struct list_head *mid, *left, *right;
-    left = right = head;
-    do {
-        left = left->next;
-        right = right->prev;
-    } while (left != right && left->next != right);
-    mid = left;
+    struct list_head *mid;
+    struct list_head *slow = head->next;
+    for (struct list_head *fast = head->next->next;
+         fast != head && fast->next != head; fast = fast->next->next) {
+        slow = slow->next;
+    }
 
-    // struct list_head *slow = head->next;  // 標記1
-    // for(struct list_head *fast = head; fast != head && fast->next != head;
-    // fast = fast->next->next){
-    //     slow = slow->next;
-    // }
-    // struct list_head *mid = slow; // 標記2
-
-    // element_t *mid_ele = list_entry(mid, element_t, list);
-    // printf("%s\n", mid_ele->value);
-
-    //上面的標記處要有一個有->next 否則可能會存取到head造成錯誤
-    //*fast = head 不能加->next 否則會造成找到的mid都是head 形成無窮迴圈
-    // 雖然可以執行但是並沒有找到正確的mid
+    mid = slow;
 
     LIST_HEAD(second);
     list_cut_position(&second, mid, head->prev);
@@ -273,7 +249,7 @@ void q_sort(struct list_head *head, bool descend)
     q_sort(&second, descend);
 
     /* Merge */
-    q_merage_two(head, &second, descend);
+    q_merge_two(head, &second, descend);
 }
 
 /* Remove every node which has a node with a strictly less value anywhere to
