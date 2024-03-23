@@ -42,6 +42,7 @@
 
 #define ENOUGH_MEASURE 10000
 #define TEST_TRIES 10
+#define DUDECT_NUMBER_PERCENTILES (100)
 
 static t_context_t *t;
 
@@ -64,16 +65,56 @@ static void differentiate(int64_t *exec_times,
         exec_times[i] = after_ticks[i] - before_ticks[i];
 }
 
-static void update_statistics(const int64_t *exec_times, uint8_t *classes)
+static int cmp(const int64_t *a, const int64_t *b)
 {
-    for (size_t i = 0; i < N_MEASURES; i++) {
+    if (*a == *b)
+        return 0;
+    return (*a > *b) ? 1 : -1;
+}
+
+static int64_t percentile(int64_t *a_sorted, double which, size_t size)
+{
+    qsort(a_sorted, size, sizeof(int64_t),
+          (int (*)(const void *, const void *)) cmp);
+    size_t array_position = (size_t) ((double) size * (double) which);
+    assert(array_position < size);
+    return a_sorted[array_position];
+}
+
+/*
+ set different thresholds for cropping measurements.
+ the exponential tendency is meant to approximately match
+ the measurements distribution, but there's not more science
+ than that.
+*/
+static void prepare_percentiles(int64_t *exec_times, int64_t *percentiles)
+{
+    for (size_t i = 0; i < DUDECT_NUMBER_PERCENTILES; i++) {
+        percentiles[i] = percentile(
+            exec_times,
+            1 - (pow(0.5, 10 * (double) (i + 1) / DUDECT_NUMBER_PERCENTILES)),
+            N_MEASURES);
+    }
+}
+
+static void update_statistics(const int64_t *exec_times,
+                              int64_t *percentiles,
+                              uint8_t *classes)
+{
+    for (size_t i = 10; i < N_MEASURES; i++) {
         int64_t difference = exec_times[i];
         /* CPU cycle counter overflowed or dropped measurement */
         if (difference <= 0)
             continue;
 
+        for (size_t crop_index = 0; crop_index < DUDECT_NUMBER_PERCENTILES;
+             crop_index++) {
+            if (difference < percentiles[crop_index]) {
+                t_push(t, difference, classes[i]);
+            }
+        }
         /* do a t-test on the execution time */
-        t_push(t, difference, classes[i]);
+        // t_push(t, difference, classes[i]);
     }
 }
 
@@ -123,6 +164,7 @@ static bool doit(int mode)
     int64_t *exec_times = calloc(N_MEASURES, sizeof(int64_t));
     uint8_t *classes = calloc(N_MEASURES, sizeof(uint8_t));
     uint8_t *input_data = calloc(N_MEASURES * CHUNK_SIZE, sizeof(uint8_t));
+    int64_t *percentiles = calloc(N_MEASURES + 1, sizeof(int64_t));
 
     if (!before_ticks || !after_ticks || !exec_times || !classes ||
         !input_data) {
@@ -133,7 +175,8 @@ static bool doit(int mode)
 
     bool ret = measure(before_ticks, after_ticks, input_data, mode);
     differentiate(exec_times, before_ticks, after_ticks);
-    update_statistics(exec_times, classes);
+    prepare_percentiles(exec_times, percentiles);
+    update_statistics(exec_times, percentiles, classes);
     ret &= report();
 
     free(before_ticks);
@@ -170,8 +213,11 @@ static bool test_const(char *text, int mode)
     return result;
 }
 
-#define DUT_FUNC_IMPL(op) \
-    bool is_##op##_const(void) { return test_const(#op, DUT(op)); }
+#define DUT_FUNC_IMPL(op)                \
+    bool is_##op##_const(void)           \
+    {                                    \
+        return test_const(#op, DUT(op)); \
+    }
 
 #define _(x) DUT_FUNC_IMPL(x)
 DUT_FUNCS
