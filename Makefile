@@ -42,7 +42,7 @@ OBJS := qtest.o report.o console.o harness.o queue.o \
         shannon_entropy.o \
         linenoise.o web.o \
 		shuffle.o         \
-		list_sort.o
+		list_sort.o timsort.o
 
 deps := $(OBJS:%.o=.%.o.d)
 

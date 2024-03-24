@@ -640,6 +640,56 @@ bool do_lsort(int argc, char *argv[])
     return ok && !error_check();
 }
 
+bool do_timsort(int argc, char *argv[])
+{
+    if (argc != 1) {
+        report(1, "%s takes no arguments", argv[0]);
+        return false;
+    }
+
+    int cnt = 0;
+    if (!current || !current->q)
+        report(3, "Warning: Calling sort on null queue");
+    else
+        cnt = q_size(current->q);
+    error_check();
+
+    if (cnt < 2)
+        report(3, "Warning: Calling sort on single node");
+    error_check();
+
+    set_noallocate_mode(true);
+    if (current && exception_setup(true))
+        timsort(NULL, current->q, cmp);
+    exception_cancel();
+    set_noallocate_mode(false);
+
+    bool ok = true;
+    if (current && current->size) {
+        for (struct list_head *cur_l = current->q->next;
+             cur_l != current->q && --cnt; cur_l = cur_l->next) {
+            /* Ensure each element in ascending/descending order */
+            element_t *item, *next_item;
+            item = list_entry(cur_l, element_t, list);
+            next_item = list_entry(cur_l->next, element_t, list);
+            if (!descend && strcmp(item->value, next_item->value) > 0) {
+                report(1, "ERROR: Not sorted in ascending order");
+                ok = false;
+                break;
+            }
+
+            if (descend && strcmp(item->value, next_item->value) < 0) {
+                report(1, "ERROR: Not sorted in descending order");
+                ok = false;
+                break;
+            }
+        }
+    }
+
+    q_show(3);
+    return ok && !error_check();
+}
+
 bool do_sort(int argc, char *argv[])
 {
     if (argc != 1) {
@@ -1127,6 +1177,7 @@ static void console_init()
     ADD_COMMAND(merge, "Merge all the queues into one sorted queue", "");
     ADD_COMMAND(shuffle, "shuffle the queues", "");
     ADD_COMMAND(lsort, "Use Linux kernel sorting algorithm", "");
+    ADD_COMMAND(timsort, "Sort with timsort algorithm", "");
     ADD_COMMAND(swap, "Swap every two adjacent nodes in queue", "");
     ADD_COMMAND(ascend,
                 "Remove every node which has a node with a strictly less "
