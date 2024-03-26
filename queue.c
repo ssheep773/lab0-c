@@ -166,8 +166,7 @@ void q_swap(struct list_head *head)
 
     while (first != head && first->next != head) {
         struct list_head *second = first->next;
-        list_del_init(first);
-        list_add(first, second);
+        list_move(first, second);
         first = first->next;
     }
 }
@@ -260,27 +259,20 @@ int q_ascend(struct list_head *head)
     if (!head)
         return 0;
 
-    struct list_head *cur = head->next;
+    struct list_head *cur = head->prev;
+    struct list_head *next;
 
-    while (cur != head && cur->next != head) {
-        struct list_head *nxt = cur->next;
+    while (cur->prev != head) {
+        next = cur->prev;
         element_t *cur_entry = list_entry(cur, element_t, list);
-        bool flag = false;
+        element_t *next_entry = list_entry(next, element_t, list);
 
-        while (nxt != head) {
-            element_t *nxt_entry = list_entry(nxt, element_t, list);
-            if (strcmp(cur_entry->value, nxt_entry->value) > 0) {
-                flag = true;
-                break;
-            }
-            nxt = nxt->next;
+        if (strcmp(cur_entry->value, next_entry->value) < 0) {
+            list_del(next);
+            q_release_element(next_entry);
+        } else {
+            cur = next;
         }
-        struct list_head *tmp = cur->next;
-        if (flag) {
-            list_del(cur);
-            q_release_element(cur_entry);
-        }
-        cur = tmp;
     }
     return q_size(head);
 }
@@ -293,27 +285,21 @@ int q_descend(struct list_head *head)
     if (!head)
         return 0;
 
-    struct list_head *cur = head->next;
+    struct list_head *cur = head->prev;
+    struct list_head *next;
 
-    while (cur != head && cur->next != head) {
-        struct list_head *nxt = cur->next;
+    while (cur->prev != head) {
+        next = cur->prev;
+
         element_t *cur_entry = list_entry(cur, element_t, list);
-        bool flag = false;
+        element_t *next_entry = list_entry(next, element_t, list);
 
-        while (nxt != head) {
-            element_t *nxt_entry = list_entry(nxt, element_t, list);
-            if (strcmp(cur_entry->value, nxt_entry->value) < 0) {
-                flag = true;
-                break;
-            }
-            nxt = nxt->next;
+        if (strcmp(cur_entry->value, next_entry->value) > 0) {
+            list_del(next);
+            q_release_element(next_entry);
+        } else {
+            cur = next;
         }
-        struct list_head *tmp = cur->next;
-        if (flag) {
-            list_del(cur);
-            q_release_element(cur_entry);
-        }
-        cur = tmp;
     }
     return q_size(head);
 }
