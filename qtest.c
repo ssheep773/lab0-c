@@ -24,6 +24,7 @@
 #include "list_sort.h"
 #include "random.h"
 #include "shuffle.h"
+#include "ttt_main.h"
 
 /* Shannon entropy */
 extern double shannon_entropy(const uint8_t *input_data);
@@ -180,6 +181,12 @@ static void fill_rand_string(char *buf, size_t buf_size)
         buf[n] = charset[randstr_buf_64[n] % (sizeof(charset) - 1)];
 
     buf[len] = '\0';
+}
+
+static bool do_ttt(int argc, char *argv[])
+{
+    ttt_main();
+    return true;
 }
 
 /* insertion */
@@ -1178,6 +1185,7 @@ static void console_init()
     ADD_COMMAND(shuffle, "shuffle the queues", "");
     ADD_COMMAND(lsort, "Use Linux kernel sorting algorithm", "");
     ADD_COMMAND(timsort, "Sort with timsort algorithm", "");
+    ADD_COMMAND(ttt, "Play Tic-tac-toe", "");
     ADD_COMMAND(swap, "Swap every two adjacent nodes in queue", "");
     ADD_COMMAND(ascend,
                 "Remove every node which has a node with a strictly less "
