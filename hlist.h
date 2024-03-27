@@ -79,10 +79,10 @@ static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
 static inline void hlist_add_before(struct hlist_node *n,
                                     struct hlist_node *next)
 {
-    n->pprev, next->pprev;
-    n->next, next;
-    next->pprev, &n->next;
-    *(n->pprev), n;
+    n->pprev = next->pprev;
+    n->next = next;
+    next->pprev = &n->next;
+    *(n->pprev) = n;
 }
 
 /**
@@ -93,12 +93,12 @@ static inline void hlist_add_before(struct hlist_node *n,
 static inline void hlist_add_behind(struct hlist_node *n,
                                     struct hlist_node *prev)
 {
-    n->next, prev->next;
-    prev->next, n;
-    n->pprev, &prev->next;
+    n->next = prev->next;
+    prev->next = n;
+    n->pprev = &prev->next;
 
     if (n->next)
-        n->next->pprev, &n->next;
+        n->next->pprev = &n->next;
 }
 
 /**
@@ -176,6 +176,9 @@ static inline void hlist_splice_init(struct hlist_head *from,
 
 #define hlist_entry(ptr, type, member) container_of(ptr, type, member)
 
+#define hlist_for_each(pos, head) \
+    for (pos = (head)->first; pos; pos = pos->next)
+
 #ifdef __HAVE_TYPEOF
 #define hlist_entry_safe(ptr, type, member)                  \
     ({                                                       \
@@ -196,3 +199,54 @@ static inline void hlist_splice_init(struct hlist_head *from,
     for (pos = hlist_entry_safe((head)->first, type, member); pos; \
          pos = hlist_entry_safe((pos)->member.next, type, member))
 #endif
+
+/**
+ * hlist_for_each_entry_continue - iterate over a hlist continuing after current
+ * point
+ * @pos:	the type * to use as a loop cursor.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry_continue(pos, member)                           \
+    for (pos = hlist_entry_safe((pos)->member.next, typeof(*(pos)), member); \
+         pos;                                                                \
+         pos = hlist_entry_safe((pos)->member.next, typeof(*(pos)), member))
+
+/**
+ * hlist_for_each_entry_from - iterate over a hlist continuing from current
+ * point
+ * @pos:	the type * to use as a loop cursor.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry_from(pos, member) \
+    for (; pos;                                \
+         pos = hlist_entry_safe((pos)->member.next, typeof(*(pos)), member))
+
+/**
+ * hlist_for_each_entry_safe - iterate over list of given type safe against
+ * removal of list entry
+ * @pos:	the type * to use as a loop cursor.
+ * @n:		a &struct hlist_node to use as temporary storage
+ * @head:	the head for your list.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry_safe(pos, n, head, member)               \
+    for (pos = hlist_entry_safe((head)->first, typeof(*pos), member); \
+         pos && ({                                                    \
+             n = pos->member.next;                                    \
+             1;                                                       \
+         });                                                          \
+         pos = hlist_entry_safe(n, typeof(*pos), member))
+
+/**
+ * hlist_count_nodes - count nodes in the hlist
+ * @head:	the head for your hlist.
+ */
+static inline size_t hlist_count_nodes(struct hlist_head *head)
+{
+    struct hlist_node *pos;
+    size_t count = 0;
+
+    hlist_for_each(pos, head) count++;
+
+    return count;
+}
